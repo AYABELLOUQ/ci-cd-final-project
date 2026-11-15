@@ -1,24 +1,32 @@
-apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: cleanup
-  labels:
-    app.kubernetes.io/part-of: ci-cd-final-project
 spec:
-  description: Remove files from the shared source workspace before cloning.
+  description: This task will clean up a workspace by deleting all the files.
   workspaces:
     - name: source
-      description: Workspace containing the application source code.
   steps:
-    - name: clean-workspace
-      image: alpine:3.20
+    - name: remove
+      image: alpine:3
+      env:
+        - name: WORKSPACE_SOURCE_PATH
+          value: $(workspaces.source.path)
       workingDir: $(workspaces.source.path)
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
       script: |
-        #!/bin/sh
+        #!/usr/bin/env sh
         set -eu
-        echo "Cleaning the shared source workspace..."
-        find . -mindepth 1 -maxdepth 1 ! -name lost+found -exec rm -rf -- {} +
-        echo "Cleanup complete."
+        echo "Removing all files from ${WORKSPACE_SOURCE_PATH} ..."
+        # Delete any existing contents of the directory if it exists.
+        # Do not delete the workspace mount itself.
+        if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
+          rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
+        fi
 ---
 apiVersion: tekton.dev/v1
 kind: Task
